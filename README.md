@@ -25,7 +25,7 @@ python3 ~/.agents/skills/cpdf-pdf-operations/scripts/preflight.py
 
 ## Why runtime detection matters
 
-The reference manual used to author this skill is cpdf 2.9, while users may have older releases. The skill always locates the user's cpdf, checks its version/help, and refuses to invent unavailable options. Version additions from 2.7 through 2.9 are documented in `references/version-compatibility.md`.
+The reference manual used to author this skill is cpdf 2.9 (cover February 2026; changelog March 2026), while users may have older releases. The skill always locates the user's cpdf, checks its version, and reads the local full option catalog (`-summary` on 2.9+, otherwise `-help`). It refuses to invent unavailable options. Version additions from 2.7 through 2.9 are documented in `references/version-compatibility.md`.
 
 **Security:** cpdf 2.9's changelog records input sanitization against command injection. Do not process untrusted PDFs or attacker-controlled values with earlier releases; upgrade to 2.9+ first. Passing smoke tests on an older binary demonstrates compatibility, not security.
 
@@ -67,4 +67,4 @@ It records a JSON report, performs operation-specific semantic assertions where 
 
 The original skill files are MIT licensed. cpdf and its manual are separate products copyrighted and licensed by Coherent Graphics; neither is redistributed here. Review cpdf's terms, especially for commercial use.
 
-Reference: *Coherent PDF Command Line Tools User Manual*, version 2.9 (2026), available from the vendor: <https://www.coherentpdf.com/>.
+Reference: *Coherent PDF Command Line Tools User Manual*, version 2.9 (February/March 2026), available from the vendor: <https://www.coherentpdf.com/>. This repository does not include that PDF.

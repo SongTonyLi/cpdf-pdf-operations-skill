@@ -24,11 +24,14 @@ def main() -> int:
         return 127
 
     rc, version_output = run(cpdf, "-version")
+    _, help_output = run(cpdf, "-help")
+    has_summary = bool(re.search(r"(?m)^\s{2}-summary\b", help_output))
     match = re.search(r"cpdf Version\s+([^\n]+)", version_output, re.IGNORECASE)
     report = {
         "cpdf": cpdf,
         "version": match.group(1).strip() if match else version_output.splitlines()[-1] if version_output else None,
         "version_exit": rc,
+        "option_catalog": "-summary" if has_summary else "-help",
         "helpers": {name: shutil.which(name) for name in HELPERS},
     }
     print(json.dumps(report, indent=2))

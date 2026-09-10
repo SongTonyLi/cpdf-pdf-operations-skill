@@ -1,6 +1,6 @@
 ---
 name: cpdf-pdf-operations
-description: Operate on PDF files with the Coherent PDF (cpdf) CLI from natural-language requests. Use for inspecting, merging, splitting, selecting, reordering, rotating, scaling, cropping, encrypting, decrypting, compressing, stamping, numbering, attaching files, handling bookmarks/metadata/images/fonts/annotations/page labels, creating or drawing PDFs, JSON conversion, accessibility/PDF-UA work, low-level PDF inspection, and sanitizing JavaScript. Also use when the user says cpdf, Coherent PDF, watermark a PDF, combine PDFs, or manipulate PDF pages.
+description: Use when operating on PDF files with the Coherent PDF (cpdf) CLI from natural-language requests. Triggers include inspecting, merging, splitting, selecting, reordering, rotating, scaling, cropping, encrypting, decrypting, compressing, squeezing, stamping, Bates numbering, attaching files, bookmarks/metadata/images/fonts/annotations/page labels, creating or drawing PDFs, JSON conversion, accessibility/PDF-UA, portfolios, rasterizing, and sanitizing JavaScript. Also use when the user says cpdf, Coherent PDF, watermark a PDF, combine PDFs, or manipulate PDF pages.
 license: MIT (skill files only; cpdf has its own license)
 compatibility: Requires a locally installed cpdf executable. Optional operations may require Ghostscript, ImageMagick, qpdf/cpdflin, jbig2enc, jbig2dec, or pnmtopng. Written from the cpdf 2.9 manual and runtime-gated for older versions.
 metadata:
@@ -32,7 +32,12 @@ If found, run:
 "$CPDF" -help
 ```
 
-Use `-help` as the source of truth for locally supported options. The bundled reference describes manual 2.9, but older binaries lack newer operations. Read [version compatibility](references/version-compatibility.md) whenever an operation might be unavailable. Never invent an option. If unavailable, explain the minimum cpdf version and direct the user to <https://www.coherentpdf.com/>; offer an alternative only with permission.
+Then treat the **full local option catalog** as the source of truth:
+
+- cpdf 2.9+ shortened `-help` / `--help` to documentation pointers and added `-summary` (and a man page). If `-help` lists `-summary`, run `"$CPDF" -summary` and use that list.
+- On 2.6–2.8.x, `-help` is still the full list and `-summary` does not exist.
+
+The bundled reference describes manual 2.9 (cover: February 2026; changelog: March 2026), but older binaries lack newer operations. Read [version compatibility](references/version-compatibility.md) whenever an operation might be unavailable. Never invent an option. If unavailable, explain the minimum cpdf version and direct the user to <https://www.coherentpdf.com/>; offer an alternative only with permission.
 
 **Security gate:** cpdf 2.9's changelog says it added input sanitization to prevent command-injection attacks. Treat pre-2.9 binaries as unsafe for untrusted PDFs, attachment names, filenames, metadata, or other attacker-controlled input—especially when an operation invokes an external helper. Recommend upgrading to 2.9+; do not process untrusted input on an older release merely because smoke tests pass.
 
@@ -47,10 +52,10 @@ Resolve all relative skill paths from this skill directory, not the user's curre
 ## Core workflow
 
 1. **Clarify only ambiguity that changes the result.** Determine input(s), output, page range/order, units, overwrite policy, passwords/permissions, and whether appearance, metadata, annotations, bookmarks, forms, attachments, or accessibility tags must be preserved.
-2. **Inspect before mutation.** Usually run `"$CPDF" -info -utf8 -- "$input"` only if the local CLI accepts `--`; cpdf 2.6 does not document `--`, so normally use `"$CPDF" -info -utf8 "$input"`. For page-sensitive work also use `-page-info`; for security work use `-contains-javascript` only when supported.
-3. **Plan the exact command.** Prefer one cpdf call and `AND` for ordered operations. Use separate intermediate files only when required. Quote every path and text argument. Never use `eval` or concatenate untrusted text into a shell command.
+2. **Inspect before mutation.** Usually run `"$CPDF" -info -utf8 "$input"`. Do not add `--` unless local `-help`/`-summary` documents it (cpdf 2.6 does not). For page-sensitive work also use `-page-info`; for security work use `-contains-javascript` only when supported. `-info` also reports encryption, AcroForm/XFA, subformats (PDF/A, PDF/UA, …), language, OpenAction, and box sizes when present.
+3. **Plan the exact command.** Prefer one cpdf call and `AND` for ordered operations. Use separate intermediate files only when required. Quote every path and text argument. Escape shell-special characters inside cpdf strings with a backslash (`Hello\!`; literal `\\`). Never use `eval` or concatenate untrusted text into a shell command.
 4. **Protect originals.** Default to a new descriptive output path. Never overwrite an input unless the user explicitly asks and a recoverable backup is made. Ensure output differs from every input. Create requested output directories first.
-5. **Preserve semantics deliberately.** Use `-process-struct-trees` for tagged/PDF-UA merge, split, stamp, TOC, imposition, or redaction when the installed version supports it. Warn when rasterizing, removing fonts/text/images/metadata/attachments/annotations, decrypting, forced repair, or low-level editing is lossy or destructive.
+5. **Preserve semantics deliberately.** Without `-process-struct-trees`, merge keeps the first file's structure tree only and split copies the whole tree into every part. Add `-process-struct-trees` (2.7.1+) to trim/merge tags for tagged/PDF-UA merge, split, stamp, TOC, imposition, or redaction. Do not use 2.7's short-lived `-no-process-struct-trees` on later versions. Warn when rasterizing, removing fonts/text/images/metadata/attachments/annotations, decrypting, forced repair, or low-level editing is lossy or destructive.
 6. **Run and check exit status.** cpdf uses exit code `1` for a bad/inappropriate password and `2` for other errors. Do not report success on nonzero exit.
 7. **Validate.** Confirm the output exists and is nonempty, then inspect with `-info` or run `python3 scripts/validate_pdf.py <output.pdf>`. Verify operation-specific facts such as page count, encryption, bookmarks, metadata, attachments, or extracted files.
 8. **Report naturally.** State what changed, the output path, checks performed, and any caveat. Include the exact command when useful, but never echo passwords.
@@ -65,10 +70,11 @@ General form:
 
 - cpdf treats arguments containing a period as file names. Prefix extensionless inputs with `-i`.
 - Put each encrypted input's `user=...` or `owner=...` next to that input. Use `-recrypt` only when retaining existing encryption is intended.
-- Prefer `-utf8` for textual input/output.
+- Text I/O defaults to `-stripped` (drop high bytes). Prefer `-utf8` for modern Unicode; `-raw` disables conversion. Text files written by cpdf use Unix LF even on Windows.
 - Measurements default to points (`72pt = 1in`); `pt`, `in`, `cm`, and `mm` are accepted. Page/box variables and arithmetic are documented in the command reference.
-- Use response files (`-args`; `-args-json` in 2.7.2+) for long or complex argument lists. A response file does **not** make embedded passwords secret.
-- Multiple ordered operations use uppercase `AND`; subsequent page selections use `-range`.
+- Use response files (`-args`; `-args-json` in 2.7.2+, JSON string array, C-style comments allowed) for long or complex argument lists. A response file does **not** make embedded passwords secret. `-control` was removed in 2.7.2.
+- Multiple ordered operations use uppercase `AND`; subsequent page selections use `-range`. In 2.9+, `-create-pdf` and friends may appear in the middle of an `AND` chain.
+- Add `-fast` only on the operations listed in the command reference (selected scale/rotate/stamp/impose ops). Skip it unless the inputs are known ISO-compliant.
 - When outputting binary PDF to stdout, redirect or pipe it; never dump it to the terminal.
 - A password may appear in process listings and logs. Avoid printing it, avoid persistent command history where possible, and remove temporary response files containing it.
 
@@ -89,7 +95,7 @@ Common natural-language mappings:
 | pages with annotations | `annotated` (2.9+) |
 | page by label | `[iii]` (manual syntax; verify locally) |
 
-Ranges contain no spaces. Do not use the 2.9 `empty` range on older binaries.
+Ranges contain no spaces. Do not use the 2.9 `empty` range on older binaries. Newer versions may tolerate some nonexistent page numbers; they still error if the result would have no pages.
 
 ## Choose the operation family
 
@@ -110,6 +116,7 @@ Read [the command reference](references/command-reference.md) for exact syntax a
 | metadata/open view/language/labels | `-set-*`, `-metadata`, viewer preferences, `-add-page-labels` |
 | attachments | `-attach-file`, `-list-attached-files`, `-dump-attachments`, `-remove-files` |
 | images/rasterization | `-list-images*`, `-extract-images`, `-process-images`, `-rasterize`, `-output-image` |
+| strip unused metadata | `-remove-article-threads`, `-remove-page-piece`, `-remove-web-capture`, `-remove-procsets`, `-remove-output-intents` (2.9+) |
 | fonts | `-list-fonts*`, `-copy-font`, `-extract-font`, `-missing-fonts`, `-embed-missing-fonts` |
 | editable PDF representation | `-output-json`, `-j` |
 | layers/optional content | `-ocg-*` |
@@ -121,7 +128,7 @@ Read [the command reference](references/command-reference.md) for exact syntax a
 
 - **Redaction:** `-redact` removes whole-page content only; it is not area/text redaction. A filled rectangle merely hides content and is not secure redaction. Say this explicitly.
 - **Passwords:** never include a real password in the final response or test logs. Ask for it only when required.
-- **Encryption:** recommend `AES256ISO` for new files. Never recommend insecure `40bit` or `128bit`; `AES256` is deprecated.
+- **Encryption:** recommend `AES256ISO` for new files. Never recommend insecure `40bit` or `128bit`; `AES256` is deprecated. cpdf does **not** SASLPrep Unicode AES-256 passwords—pass already-normalized UTF-8. Encryption flags may also be added to `-split` / `-split-bookmarks` to encrypt each part.
 - **Forced decryption/repair:** use `-decrypt-force` or Ghostscript repair only after warning and user approval; these can bypass permissions or lose metadata.
 - **Lossy actions:** require explicit intent before rasterization, image recompression, `-draft`, `-remove-all-text`, font removal, or metadata/attachment/annotation removal.
 - **Low-level edits:** inspect first, make a backup, and validate. `-replace-obj`, `-remove-obj`, dictionary edits, stream replacement, and JSON editing can corrupt a PDF.
@@ -129,6 +136,16 @@ Read [the command reference](references/command-reference.md) for exact syntax a
 - **Attachments:** list names before extraction. By default do not add `-raw` or `-utf8` to `-dump-attachments`, because cpdf's default strips dubious filename characters. Extract only into a newly created empty directory, then verify every resolved output remains inside it.
 - **External tools:** do not assume they exist. Locate them with `command -v` and pass the exact path using `-gs`, `-im`, `-p2p`, `-jbig2enc`, `-jbig2dec`, or `-cpdflin` as appropriate.
 - **Licensing:** cpdf is separate software with its own license. This skill does not redistribute it or change its licensing terms.
+
+## Common mistakes
+
+- Treating 2.9 `-help` as the full option list — use `-summary`.
+- Using 2.7's `-no-process-struct-trees` on 2.7.1+ — polarity flipped to opt-in `-process-struct-trees`.
+- Putting a text watermark “behind” pages without `-underneath` (or using `-stamp-on` instead of `-stamp-under`).
+- Inventing `-output-annotations-json` (chapter 19 slip) — the operation is `-list-annotations-json`.
+- Inventing `-remove-alternate-images` — 2.9 changelog mentions alternate-image removal, but the extracted manual never names the operation. Confirm spelling with local `-summary` before using anything.
+- Using `-stamp-scale-to-fit` without a local catalog match; prose/changelog use `-scale-stamp-to-fit`.
+- Adding `-fast` to arbitrary operations.
 
 ## Fast recipes
 
@@ -145,7 +162,10 @@ Read [the command reference](references/command-reference.md) for exact syntax a
 # Add page numbers at bottom center
 "$CPDF" -add-text "Page %Page of %EndPage" -bottom 18 -utf8 "in.pdf" -o "numbered.pdf"
 
-# Watermark under every page
+# Translucent text watermark behind every page
+"$CPDF" -add-text DRAFT -diagonal -underneath -font Helvetica-Bold -font-size 72 -color red -opacity 0.25 "in.pdf" -o "draft.pdf"
+
+# Watermark under every page from another PDF
 "$CPDF" -stamp-under "watermark.pdf" "in.pdf" -o "watermarked.pdf"
 
 # Secure modern encryption (replace variables without logging them)
@@ -161,7 +181,7 @@ For more recipes—including attachment, metadata, bookmark, JSON, image, drawin
 ## Completion checklist
 
 - [ ] Re-located cpdf with `command -v cpdf` for this task.
-- [ ] Checked `-version` and local `-help`.
+- [ ] Checked `-version` and the local full option catalog (`-summary` on 2.9+, otherwise `-help`).
 - [ ] Confirmed inputs and output do not collide.
 - [ ] Explained destructive/lossy/security-sensitive effects.
 - [ ] Used only locally supported options and available helper tools.

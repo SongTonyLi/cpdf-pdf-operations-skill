@@ -1,6 +1,6 @@
 # Natural-language recipes
 
-Each recipe begins by re-running `command -v cpdf`, `cpdf -version`, and local help. Set `CPDF` to the resolved path. Replace sample paths only after quoting them. Never overwrite an input by default.
+Each recipe begins by re-running `command -v cpdf`, `cpdf -version`, and the local full option catalog (`-summary` on 2.9+, otherwise `-help`). Set `CPDF` to the resolved path. Replace sample paths only after quoting them. Never overwrite an input by default.
 
 ## Inspect and select
 
@@ -91,11 +91,13 @@ For cpdf 2.6, use two safe selections instead:
 
 ## Watermarks, numbering, and overlays
 
-**“Add a translucent diagonal DRAFT watermark.”**
+**“Add a translucent diagonal DRAFT watermark behind every page.”**
 
 ```bash
-"$CPDF" -add-text DRAFT -diagonal -font Helvetica-Bold -font-size 72 -color red -opacity 0.25 "input.pdf" -o "draft.pdf"
+"$CPDF" -add-text DRAFT -diagonal -underneath -font Helvetica-Bold -font-size 72 -color red -opacity 0.25 "input.pdf" -o "draft.pdf"
 ```
+
+Without `-underneath`, the text is stamped on top of the page.
 
 **“Number pages in the bottom-right starting with the PDF page count.”**
 
@@ -149,12 +151,34 @@ Check page count and output size. Do not promise a reduction.
 "$CPDF" -image-resolution 300 "input.pdf"
 ```
 
+On 2.9+, add `-inline` to include inline images. `-list-images` reports mask type and mask object number.
+
+**“Recompress JPEGs to quality 70 at half size.”** (2.8+)
+
+```bash
+"$CPDF" -process-images -im "$(command -v magick)" -jpeg-to-jpeg 70 -jpeg-to-jpeg-scale 50 -process-images-info "input.pdf" -o "recompressed.pdf"
+```
+
+**“Convert lossless images to JPEG2000.”** (2.9+)
+
+```bash
+"$CPDF" -process-images -im "$(command -v magick)" -lossless-to-jpeg2000 50 "input.pdf" -o "jpeg2000.pdf"
+```
+
+**“Strip unused article threads, web-capture data, and output intents.”** (2.9+)
+
+```bash
+"$CPDF" -remove-article-threads "input.pdf" AND -remove-web-capture AND -remove-output-intents -o "stripped-metadata.pdf"
+```
+
 **“Extract all images.”**
 
 ```bash
 mkdir -p "extracted-images"
 "$CPDF" -extract-images "input.pdf" -im "$(command -v magick)" -dedup -o "extracted-images/%%%"
 ```
+
+On 2.9+, add `-inline` for inline images and `-merge-masks` to combine soft masks into `*-combined` PNGs. `%objnum` in the output name requires 2.8.1+.
 
 If `magick` is absent, check `pnmtopng`; otherwise explain the dependency. Do not extract into a nonempty unrelated directory.
 
@@ -283,7 +307,13 @@ Validate page count, encryption, metadata, bookmarks, and attachments; JSON edit
 
 Explain that the verifier is partial and human checks remain. Do not mark the PDF as conforming merely because the user asks to “make it accessible.”
 
-For tagged merge/split/stamp work, add `-process-struct-trees` when supported and validate the output structure.
+For tagged merge/split/stamp work, add `-process-struct-trees` when supported (2.7.1+) and validate the output structure. Without that flag, merge keeps only the first file's tree and split copies the whole tree into every part. Do not use 2.7's `-no-process-struct-trees` on later versions.
+
+**“Merge two tagged PDFs and keep a combined structure tree.”** (2.7.1+)
+
+```bash
+"$CPDF" -merge -process-struct-trees "a.pdf" "b.pdf" -o "merged-tagged.pdf"
+```
 
 ## JavaScript sanitization (2.9+)
 

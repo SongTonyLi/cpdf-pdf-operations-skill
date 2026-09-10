@@ -1,6 +1,6 @@
 # cpdf command reference (manual 2.9)
 
-This is an original condensed guide to the operation families in the Coherent PDF Command Line Tools 2.9 manual. It does not reproduce or replace the manual. **Check local `cpdf -help` before using any option.** See `version-compatibility.md` for older binaries.
+This is an original condensed guide to the operation families in the Coherent PDF Command Line Tools 2.9 manual (cover February 2026; changelog March 2026). It does not reproduce or replace the manual. **Check the local full option catalog before using any option:** `-summary` on 2.9+, otherwise `-help`. See `version-compatibility.md` for older binaries.
 
 `in.pdf [range] -o out.pdf` is omitted from many fragments below. Quote paths and compound arguments.
 
@@ -11,9 +11,11 @@ This is an original condensed guide to the operation families in the Coherent PD
 - Streams: `-stdin`, `-stdout`, `-stdin-owner`, `-stdin-user`.
 - Encrypted input credentials follow each input: `user=<password>` or `owner=<password>`; `-recrypt` preserves input encryption.
 - Ordered operations: `... AND -range <range> <next operation> ... -o out.pdf`.
-- Long command lines: `-args file`; 2.7.2+ also supports a JSON string array with `-args-json file`.
-- Text: normally add `-utf8`; alternatives are `-stripped` and `-raw`.
-- General output controls: `-producer`, `-creator`, `-keep-version`, `-change-id`, `-l`, `-keep-l`, `-cpdflin`, `-no-preserve-objstm`, `-create-objstm`, `-error-on-malformed`, `-fast`, `-progress` (2.9+).
+- Long command lines: `-args file` (textual substitution); 2.7.2+ also supports a JSON string array with `-args-json file` (C-style comments allowed). `-control` was removed in 2.7.2.
+- Text: default is `-stripped` (drop bytes > 127). Prefer `-utf8`; `-raw` performs no conversion. Written text files use Unix LF even on Windows.
+- String arguments: cpdf unescapes `\` so shell-special characters can be passed (`Hello\!`; write `\\` for a literal backslash).
+- General output controls: `-producer`, `-creator`, `-keep-version`, `-change-id`, `-l`, `-keep-l`, `-cpdflin`, `-no-preserve-objstm`, `-create-objstm`, `-error-on-malformed`, `-progress` (2.9+). `-help` / `--help` is a short pointer page in 2.9+; `-summary` lists operations.
+- `-fast` is allowed only on: `-rotate-contents`, `-upright`, `-vflip`, `-hflip`, `-shift`, `-scale-page`, `-scale-to-fit`, `-scale-contents`, `-center-to-fit`, `-stretch`, `-show-boxes`, `-hard-box`, `-trim-marks`, `-add-text`, `-add-rectangle`, `-stamp-on`, `-stamp-under`, `-combine-pages`, `-impose`, `-impose-xy`, `-twoup`, `-twoup-stack`. Skip it unless inputs are known ISO-compliant.
 - Repair with Ghostscript: `-gs <path> -gs-malformed` or the exact force form `cpdf in.pdf -gs <path> -gs-malformed-force -o out.pdf [-gs-quiet]`. This may lose metadata.
 - Exit `1`: password problem. Exit `2`: other cpdf error.
 
@@ -24,8 +26,8 @@ This is an original condensed guide to the operation families in the Coherent PD
 - Selectors: `odd`, `even`, `portrait`, `landscape`, `reverse`, `all`, `annotated` (2.9+), `empty` (2.9+).
 - Modifiers: `NOT1-3` excludes; `2DUP1-5` duplicates every selected page twice.
 - Page labels may stand in for numbers, e.g. `[iii]`.
-- Ranges contain no spaces. Newer versions tolerate some nonexistent pages; never rely on that without checking locally.
-- `-process-struct-trees` trims/merges tagged structure where supported.
+- Ranges contain no spaces. 2.9+ may tolerate some nonexistent page numbers, but still errors if the output would have no pages.
+- Without `-process-struct-trees`, selection keeps the structure tree whole, merge keeps the first file's tree only, and split copies the whole tree into every part. Add `-process-struct-trees` (2.7.1+) to trim/merge. 2.7 briefly had the opposite opt-out `-no-process-struct-trees`; do not use that flag on 2.7.1+.
 
 ### Units and geometry
 
@@ -37,8 +39,8 @@ Named sizes: A0–A10 portrait/landscape; `usletterportrait`, `usletterlandscape
 
 - Merge/select/reorder: `-merge a.pdf [range] b.pdf [range] ... -o out.pdf`; `-merge` is the default.
 - Merge modifiers: `-collate`, `-collate-n n` (2.8+), `-retain-numbering`, `-merge-add-bookmarks`, `-merge-add-bookmarks-use-titles`, `-remove-duplicate-fonts`, `-process-struct-trees`, `-subformat PDF/UA-2`.
-- Portfolio (2.9+): `-portfolio base.pdf -pf file [-pfd description] [-pfr relationship] ...`.
-- Split: `-split in.pdf [-chunk n] -o 'part%%%.pdf'`.
+- Portfolio (2.9+): `-portfolio` on a base PDF with repeated `-pf file [-pfd description] [-pfr relationship]`. A typical blank base is `-create-pdf AND -portfolio -pf ...`. Viewer support is limited (Adobe-centric).
+- Split: `-split in.pdf [-chunk n] -o 'part%%%.pdf'`. The output directory must already exist. Encryption flags or `-recrypt` may be added so each part is encrypted.
 - Split at bookmarks: `-split-bookmarks level in.pdf -o '@B.pdf'`.
 - Split to size (2.7+): `-split-max 10MiB in.pdf -o 'part%%%.pdf'`; suffixes `kB KiB MB MiB GB GiB`.
 - Spray/de-collate (2.7+): `-spray in.pdf -o a.pdf -o b.pdf ...`.
@@ -66,14 +68,15 @@ Named sizes: A0–A10 portrait/landscape; `usletterportrait`, `usletterlandscape
 - Use `AES256ISO` for new PDFs. `40bit` and `128bit` are insecure; `AES256` is deprecated; `AES` is older 128-bit AES.
 - Permissions: `-no-edit`, `-no-print`, `-no-copy`, `-no-annot`, `-no-forms`, `-no-extract`, `-no-assemble`, `-no-hq-print`.
 - Prefix passwords with `-pw=` if they could be parsed as options.
+- AES-256 Unicode passwords must already be SASLPrep-normalized UTF-8 truncated to 127 bytes; cpdf does not preprocess them.
 - Decrypt: `-decrypt in.pdf owner=<owner-password> -o out.pdf`. User password cannot decrypt.
 - `-decrypt-force` bypasses password/permission checks; require explicit approval.
 
 ## 5. Compression and removal of ancillary data
 
 - Streams: `-decompress [-just-content] [-jbig2dec path]`, `-compress`.
-- Lossless structural optimization: `-squeeze [-squeeze-log-to file] [-squeeze-no-pagedata]`. Deprecated `-squeeze-no-recompress` has no effect since 2.6.
-- Remove ancillary data (2.9+): `-remove-article-threads`, `-remove-page-piece`, `-remove-web-capture`, `-remove-procsets`, `-remove-output-intents`.
+- Lossless structural optimization: `-squeeze [-squeeze-log-to file] [-squeeze-no-pagedata]`. Adding `-squeeze` beside another operation squeezes on write. Deprecated `-squeeze-no-recompress` has no effect since 2.6. 2.9+ also squeezes xobjects nested inside xobjects.
+- Remove ancillary data (2.9+): `-remove-article-threads`, `-remove-page-piece`, `-remove-web-capture`, `-remove-procsets`, `-remove-output-intents`. The 2.9 changelog also mentions removing alternate images, but the manual body never names that operation—confirm with local `-summary`.
 - Image recompression is under `-process-images`; removal commands for annotations, metadata, files, fonts, text, and images are in their sections.
 
 ## 6. Bookmarks and generated TOC
@@ -93,9 +96,9 @@ Omit `-trans` to remove transitions on selected pages. Direction values depend o
 
 ## 8. Stamps, watermarks, text, rectangles
 
-- Stamp first page of another PDF: `-stamp-on stamp.pdf` or `-stamp-under stamp.pdf`; options include position, `-scale-stamp-to-fit`, `-relative-to-cropbox`, `-process-struct-trees`.
-- Pagewise overlay: `-combine-pages over.pdf under.pdf`; options `-prerotate`, `-underneath` (2.8.1+), `-scale-stamp-to-fit` (2.8.1+), `-process-struct-trees`. The 2.9 manual synopsis inconsistently says `-stamp-scale-to-fit`, while prose/changelog say `-scale-stamp-to-fit`; require an exact local `-help`/`-summary` match.
-- Text: `-add-text 'text'`; remove text previously added by cpdf: `-remove-text`.
+- Stamp first page of another PDF: `-stamp-on stamp.pdf` or `-stamp-under stamp.pdf`; options include position, `-scale-stamp-to-fit`, `-relative-to-cropbox`, `-process-struct-trees` (stamp marked as artifact).
+- Pagewise overlay: `-combine-pages over.pdf under.pdf` (output length follows the under file). Options: `-prerotate`, `-underneath` (2.8.1+), `-scale-stamp-to-fit` (2.8.1+), `-process-struct-trees`. The 2.9 synopsis inconsistently writes `-stamp-scale-to-fit`; prose and changelog use `-scale-stamp-to-fit`. Require an exact local `-summary`/`-help` match.
+- Text: `-add-text 'text'` (default: 12pt black Times Roman, top-left, over the page). Put it behind content with `-underneath`. Remove text previously added by cpdf: `-remove-text`. `-shift` may be combined with `-add-text` for extra offset.
 - Rectangle: `-add-rectangle 'w h'`; useful for visual hiding/highlighting, **not secure redaction**.
 - Font: standard 14 via `-font` and `-font-size`; embed with `-embed-std14 dir`; custom TTF with `-load-ttf Name=file -font Name`.
 - Styling: `-color` (named, gray, RGB, CMYK), `-opacity`, `-outline`, `-linewidth`, `-line-spacing`, `-justify-left`, `-justify-right`, `-justify-center`.
@@ -116,7 +119,7 @@ Omit `-trans` to remove transitions on selected pages. Direction values depend o
 
 ## 10. Annotations
 
-- List text: `-list-annotations [range]`; structured: `-list-annotations-json [range]`.
+- List text: `-list-annotations [range]`; structured: `-list-annotations-json [range]`. Chapter 19 sometimes writes `-output-annotations-json`; that is a slip—use `-list-annotations-json`.
 - Add from JSON: `-set-annotations file [-underneath]`.
 - Copy: `-copy-annotations from.pdf to.pdf [range] -o out.pdf`.
 - Remove: `-remove-annotations [range]`.
@@ -124,7 +127,7 @@ Omit `-trans` to remove transitions on selected pages. Direction values depend o
 
 ## 11. Information, metadata, opening behavior, labels
 
-- Inspect: `-info`, `-page-info [range]`, `-pages`; JSON variants (2.7+): `-info-json`, `-page-info-json`; units `-in`, `-cm`, `-mm` (expanded in 2.8).
+- Inspect: `-info`, `-page-info [range]`, `-pages`; JSON variants (2.7+): `-info-json`, `-page-info-json`; units `-in`, `-cm`, `-mm` (expanded in 2.8). `-info` also reports OpenAction, AcroForm/XFA, mark-info, language, subformats (PDF/A, PDF/X, PDF/E, PDF/VT, PDF/UA), and a page-size summary when present.
 - Set old-style info: `-set-title`, `-set-author`, `-set-subject`, `-set-keywords`, `-set-creator`, `-set-producer`, `-set-create`, `-set-modify`, `-set-trapped`, `-set-untrapped`; optionally `-also-set-xmp` or `-just-set-xmp`.
 - Main XMP: `-set-metadata file`, `-print-metadata`, `-remove-metadata`, `-create-metadata`, `-set-metadata-date date`. All streams (2.9+): `-remove-all-metadata`, `-extract-all-metadata -o directory`.
 - Initial layout: `-set-page-layout SinglePage|OneColumn|TwoColumnLeft|TwoColumnRight|TwoPageLeft|TwoPageRight`.
@@ -145,14 +148,14 @@ Omit `-trans` to remove transitions on selected pages. Direction values depend o
 
 ## 13. Images and rasterization
 
-- List image objects (2.7+): `-list-images` or `-list-images-json`, with a range. Adding `-inline` to include inline images requires 2.9+.
-- Effective DPI: `-image-resolution` or `-image-resolution-json` plus threshold/range; all uses (2.7+): `-list-images-used` or `-list-images-used-json`.
-- Extract: `-extract-images [range] [-im magick] [-p2p pnmtopng] [-raw] [-dedup|-dedup-perpage] -o 'dir/%%%'`. Output directory must exist. Inline extraction and soft-mask extraction/`-merge-masks` require 2.9+.
-- Extract one object (2.9+): `-extract-single-image object ... -o stem`.
-- Reprocess (2.7+): `-process-images` with ImageMagick/JBIG2 tools. Base methods include `-jpeg-to-jpeg quality`, `-lossless-to-jpeg quality`, `-lossless-resample percent`, `-lossless-resample-dpi dpi`, and `-1bpp-method JBIG2|JBIG2Lossy`. JPEG scale/DPI controls require 2.8+. JPEG2000 conversion/reprocessing and `CCITTG4|CCITTG3` methods require 2.9+.
+- List image objects (2.7+): `-list-images` or `-list-images-json`, with a range. Fields include object, pages, name, width, height, bytes, bpc, colour space, filter, mask type (`ExplicitMask`, `ColourKeyMask`, `SMask`, `SMaskInData`, `NoMask`), and mask object. Adding `-inline` to include inline images (object 0, name `/InlineImage`) requires 2.9+. 2.9 also reports CCITT flavour and lossy vs lossless JBIG2.
+- Effective DPI: `-image-resolution` or `-image-resolution-json` plus threshold/range; all uses (2.7+): `-list-images-used` or `-list-images-used-json`. Add `-inline` (2.9+) to include inline images.
+- Extract: `-extract-images [range] [-im magick] [-p2p pnmtopng] [-raw] [-dedup|-dedup-perpage] -o 'dir/%%%'`. Output directory must exist. `%objnum` may be used in the output name (2.8.1+). Inline extraction (`-inline`, filenames get `-inline`) and soft-mask extraction/`-merge-masks` (writes `*-combined` PNGs) require 2.9+. Lossy JBIG2 globals are written as `<n>.jbig2global`.
+- Extract one object (2.9+): `-extract-single-image object ... -o stem`. Does not work for lossy JBIG2 images that share JBIG2Globals.
+- Reprocess (2.7+): `-process-images` with ImageMagick/JBIG2 tools. Methods: `-jpeg-to-jpeg quality`, `-jpeg-to-jpeg-scale percent` (2.8+), `-jpeg-to-jpeg-dpi dpi` (2.8+), `-lossless-to-jpeg quality`, `-lossless-to-jpeg2000 n` (2.9+), `-jpeg2000-to-jpeg2000 n` (2.9+), `-lossless-resample percent`, `-lossless-resample-dpi dpi`, and `-1bpp-method JBIG2|JBIG2Lossy|CCITTG4|CCITTG3` (`CCITT*` require 2.9+). Set `CPDF_SHOW_EXT=true` to print the external-tool invocations. 2.9 can process lossless CMYK images.
 - Thresholds: `-pixel-threshold`, `-length-threshold`, `-percentage-threshold`, `-dpi-threshold`, `-process-images-info`, `-resample-interpolate`, `-jbig2-lossy-threshold`; `-process-images-force` requires 2.9+.
 - Rasterize pages into a PDF (2.8+): `-gs path -rasterize`; export images: `-output-image ... -o 'page%%%.png'`.
-- Raster options: `-rasterize-gray`, `-rasterize-1bpp`, `-rasterize-jpeg`, `-rasterize-jpeggray`, `-rasterize-jpeg-quality`, `-rasterize-res`, `-rasterize-annots`, `-rasterize-no-antialias`, `-rasterize-downsample`; `-tobox /Box` for export. `-rasterize-alpha` requires 2.9+.
+- Raster options: `-rasterize-gray`, `-rasterize-1bpp`, `-rasterize-jpeg`, `-rasterize-jpeggray`, `-rasterize-jpeg-quality`, `-rasterize-res`, `-rasterize-annots`, `-rasterize-no-antialias`, `-rasterize-downsample`; `-tobox /Box` for export. `-rasterize-alpha` and 8-bit alpha PNGs (`-png`, `-output-image`, `-draw`) require 2.9+.
 
 ## 14. Fonts
 
@@ -167,7 +170,8 @@ Omit `-trans` to remove transitions on selected pages. Direction values depend o
 
 - Export: `-output-json in.pdf -o out.json`; options `-output-json-parse-content-streams`, `-output-json-no-stream-data` (not round-trippable), `-output-json-decompress-streams`, `-utf8`; `-output-json-clean-strings` is deprecated.
 - Import: `-j in.json -o out.pdf`; cpdf repairs stream `/Length` values.
-- CPDFJSON wraps integers as `{"I": n}`, floats as `{"F": n}`, names as `{"N": "/Name"}`, Unicode as `{"U": "text"}`, streams as `{"S": [dictionary, data]}`.
+- File is an array of `[object-number, object]`. Object `-1` is cpdf's wrapper (`/CPDFJSONformatversion` currently 3, plus parse/stream/version flags). Object `0` is the trailer. Objects `1..n` are PDF objects.
+- CPDFJSON wraps integers as `{"I": n}`, floats as `{"F": n}`, names as `{"N": "/Name"}`, Unicode as `{"U": "text"}`, streams as `{"S": [dictionary, data]}`. 2.9 allows Float/Int wrappers anywhere in CPDFJSON and bookmark JSON.
 - Back up first. Arbitrary edits can corrupt semantics or security properties.
 
 ## 16. Optional content groups (layers)
@@ -179,7 +183,7 @@ Omit `-trans` to remove transitions on selected pages. Direction values depend o
 
 ## 17. Create PDFs
 
-- Blank: `-create-pdf [-create-pdf-pages n] [-create-pdf-papersize size]` (default one A4 portrait page).
+- Blank: `-create-pdf [-create-pdf-pages n] [-create-pdf-papersize size]` (default one A4 portrait page). In 2.9+, `-create-pdf` and friends may appear in the middle of an `AND` chain.
 - Typeset UTF-8 text: `-typeset file [-create-pdf-papersize size] [-font name] [-font-size n]`.
 - Images: `-png image.png`, `-jpeg image.jpg`, `-jpeg2000 image.jp2` (2.7.1+); repeat inputs to form pages.
 - JBIG2 (2.7+): repeat `-jbig2 page`; optional `-jbig2-global data`, reset with `-jbig2-global-clear`.
@@ -196,7 +200,7 @@ Start with `in.pdf [range] -draw ...` or `-create-pdf AND -draw ...`.
 - Reuse: `-xobj-bbox`, `-xobj name ... -end-xobj`, `-use name`.
 - Images: `-draw-jpeg`, `-draw-png`, `-draw-jpeg2000` (2.9+), then `-image name`.
 - Transparency: `-fill-opacity`, `-stroke-opacity`.
-- Text: `-bt ... -et`, `-text`, `-stext`, `-font`, `-font-size`, `-leading`, `-charspace`, `-wordspace`, `-textscale`, `-rendermode 0..7`, `-rise`, `-nl`, `-text-width`.
+- Text: `-bt ... -et`, `-text`, `-stext`, `-font`, `-font-size`, `-leading`, `-charspace`, `-wordspace`, `-textscale`, `-rendermode 0..7`, `-rise`, `-nl`, `-text-width`. One synopsis writes `-fontsize` for `-text-width`; use `-font-size`.
 - Paragraphs (2.7.2+): `-para 'L200pt=text'`; `-paras` plus `-indent`; no automatic multipage flow.
 - Continue/create page: `-newpage`.
 - Structure (2.7.2+): place `-draw-struct-tree` before `-draw`; use `-tag/-end-tag`, `-stag/-end-stag`, `-auto-tags/-no-auto-tags`, `-artifact/-end-artifact`, `-no-auto-artifacts`, `-namespace`, `-eltinfo/-end-eltinfo`, `-rolemap`.
@@ -212,7 +216,7 @@ Start with `in.pdf [range] -draw ...` or `-create-pdf AND -draw ...`.
 
 ## 20. Miscellaneous, sanitization, low-level inspection
 
-- Remove images: `-draft [-boxes]`; one named image: `-draft-remove-only /Name [range]`.
+- Remove images: `-draft [-boxes]`; one named image (must not be reused on other pages): `-draft-remove-only "/Im1" [range]`. `-blacktext`/`-blacklines`/`-blackfills` do not affect outlined text or form text.
 - Remove text: `-remove-all-text [range]`.
 - Normalize colors: `-blacktext`, `-blacklines`, `-blackfills`; despite names, `-color` can choose another color.
 - Clamp line thickness: `-thinlines value`; negative values to enforce a maximum require 2.9+.
