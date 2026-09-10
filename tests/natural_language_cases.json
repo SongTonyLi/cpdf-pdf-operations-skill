@@ -50,5 +50,13 @@
   {"id":"no-ocr","prompt":"OCR this scanned PDF using cpdf.","expected_behavior":"explain cpdf has no OCR and ask before using another tool","family":"limitation"},
   {"id":"no-fake-redaction","prompt":"Securely redact this sentence by drawing a black box over it.","expected_behavior":"refuse to call a visual cover secure redaction; explain whole-page-only cpdf redaction","family":"limitation"},
   {"id":"untrusted-old-cpdf","prompt":"Open this untrusted uploaded PDF with cpdf 2.8.","expected_behavior":"stop because pre-2.9 cpdf lacks the documented command-injection input sanitization; recommend upgrade","family":"preflight"},
-  {"id":"missing-cpdf","prompt":"Merge these PDFs on a machine where cpdf is not installed.","expected_behavior":"run command -v cpdf, stop, and prompt download from https://www.coherentpdf.com/","family":"preflight"}
+  {"id":"missing-cpdf","prompt":"Merge these PDFs on a machine where cpdf is not installed.","expected_behavior":"run command -v cpdf, stop, and prompt download from https://www.coherentpdf.com/","family":"preflight"},
+  {"id":"help-vs-summary","prompt":"On cpdf 2.9, list every supported operation so you can pick the right flag.","expected_options":["-summary"],"minimum_version":"2.9","family":"preflight"},
+  {"id":"jpeg-scale","prompt":"Recompress existing JPEGs to quality 70 and scale them to 50 percent.","expected_options":["-process-images","-jpeg-to-jpeg","-jpeg-to-jpeg-scale"],"minimum_version":"2.8","family":"images"},
+  {"id":"jpeg2000","prompt":"Convert lossless images in this PDF to JPEG2000.","expected_options":["-process-images","-lossless-to-jpeg2000"],"minimum_version":"2.9","family":"images"},
+  {"id":"inline-masks","prompt":"Extract images including inline images and merge any soft masks.","expected_options":["-extract-images","-inline","-merge-masks"],"minimum_version":"2.9","family":"images"},
+  {"id":"ancillary-strip","prompt":"Strip article threads, web-capture data, and output intents.","expected_options":["-remove-article-threads","-remove-web-capture","-remove-output-intents"],"minimum_version":"2.9","family":"compression"},
+  {"id":"tagged-merge","prompt":"Merge these two tagged PDFs and keep a combined structure tree.","expected_options":["-merge","-process-struct-trees"],"minimum_version":"2.7.1","family":"accessibility"},
+  {"id":"no-old-struct-opt-out","prompt":"On cpdf 2.8, disable structure-tree processing with -no-process-struct-trees.","expected_behavior":"refuse the 2.7-only opt-out; from 2.7.1 structure-tree trim/merge is opt-in via -process-struct-trees","family":"preflight"},
+  {"id":"annotation-json-alias","prompt":"Export annotations with -output-annotations-json.","expected_behavior":"do not invent -output-annotations-json; use -list-annotations-json","family":"annotations"}
 ]
